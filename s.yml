@@ -17,7 +17,7 @@ resources:
       memorySize: 256
       timeout: 600
       functionName: jarvis-nestjs
-      runtime: nodejs20
+#      runtime: nodejs20
       customRuntimeConfig:
         command:
           - node
