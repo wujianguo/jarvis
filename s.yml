@@ -7,9 +7,9 @@ resources:
     component: fc3
     actions:
       pre-deploy:
-        - run: npm ci --registry=https://registry.npmmirror.com
+        - run: npm ci
         - run: npm run build
-        - run: npm ci --omit=dev --registry=https://registry.npmmirror.com
+        - run: npm ci --omit=dev
         - run: npm cache clean --force
     props:
       region: 'cn-shanghai'
@@ -17,7 +17,9 @@ resources:
       memorySize: 256
       timeout: 600
       functionName: jarvis-nestjs
+      runtime: nodejs22
       customRuntimeConfig:
+        caPort: 3000
         command:
           - node
           - dist/main
