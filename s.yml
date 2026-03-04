@@ -1,0 +1,93 @@
+edition: 3.0.0
+name: jarvis-nestjs
+access: default
+
+resources:
+  jarvis:
+    component: fc3
+    actions:
+      pre-deploy:
+        - run: npm ci --registry=https://registry.npmmirror.com
+        - run: npm run build
+        - run: npm ci --omit=dev --registry=https://registry.npmmirror.com
+        - run: npm cache clean --force
+    props:
+      region: 'cn-shanghai'
+      code: '.'
+      memorySize: 256
+      timeout: 600
+      functionName: jarvis-nestjs
+      customRuntimeConfig:
+        command:
+          - node
+          - dist/main
+      triggers:
+        - name: defaultTrigger
+          type: http
+          config:
+            authType: anonymous
+            methods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+      customDomains:
+        - domainName: auto
+          protocol: HTTP
+          routeConfigs:
+            - path: /*
+              methods:
+                - GET
+                - POST
+                - PUT
+                - PATCH
+                - DELETE
+
+# services:
+#   nestjs:
+#     component: fc
+#     actions:
+#       pre-deploy:
+#         - run: npm ci --registry=https://registry.npmmirror.com
+#         - run: npm run build
+#         - run: npm ci --omit=dev --registry=https://registry.npmmirror.com
+#         - run: npm cache clean --force
+# #        - run: wget http://mirrors.nju.edu.cn/nodejs/v16.14.2/node-v16.14.2-linux-x64.tar.gz -O node-v16.14.2-linux-x64.tar.gz && tar -zxvf node-v16.14.2-linux-x64.tar.gz && rm -rf node-v16.14.2-linux-x64.tar.gz
+#     props: # 组件的属性值
+#       region: ${vars.region} # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
+#       service: ${vars.service}
+#       function:
+#         name: ${vars.functionName}
+#         description: ${vars.description}
+#         codeUri: '.'
+#         runtime: custom
+#         memorySize: 256
+#         timeout: 60
+#         caPort: 3000
+#         customRuntimeConfig:
+#           command:
+#             - node
+#             - dist/main
+#       triggers:
+#         - name: defaultTrigger
+#           type: http
+#           config:
+#             authType: anonymous
+#             methods:
+#               - GET
+#               - POST
+#               - PUT
+#               - PATCH
+#               - DELETE
+#       customDomains:
+#         - domainName: auto
+#           protocol: HTTP
+#           routeConfigs:
+#             - path: /*
+#               methods:
+#                 - GET
+#                 - POST
+#                 - PUT
+#                 - PATCH
+#                 - DELETE
