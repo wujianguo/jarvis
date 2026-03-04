@@ -11,16 +11,16 @@ resources:
         - run: npm run build
         - run: npm ci --omit=dev
         - run: npm cache clean --force
+        - run: wget http://mirrors.nju.edu.cn/nodejs-release/v22.16.0/node-v22.16.0-linux-x64.tar.gz -O node-v22.16.0-linux-x64.tar.gz && tar -zxvf node-v22.16.0-linux-x64.tar.gz && rm -rf node-v22.16.0-linux-x64.tar.gz
     props:
       region: 'cn-shanghai'
       code: '.'
       memorySize: 256
       timeout: 600
       functionName: jarvis-nestjs
-#      runtime: nodejs20
       customRuntimeConfig:
         command:
-          - node
+          - ./node-v22.16.0-linux-x64/bin/node
           - dist/main
       triggers:
         - triggerName: defaultTrigger
