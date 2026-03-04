@@ -22,9 +22,9 @@ resources:
           - node
           - dist/main
       triggers:
-        - name: defaultTrigger
-          type: http
-          config:
+        - triggerName: defaultTrigger
+          triggerTypee: http
+          triggerConfig:
             authType: anonymous
             methods:
               - GET
@@ -32,17 +32,17 @@ resources:
               - PUT
               - PATCH
               - DELETE
-      customDomains:
-        - domainName: auto
-          protocol: HTTP
-          routeConfigs:
-            - path: /*
-              methods:
-                - GET
-                - POST
-                - PUT
-                - PATCH
-                - DELETE
+      # customDomains:
+      #   - domainName: auto
+      #     protocol: HTTP
+      #     routeConfigs:
+      #       - path: /*
+      #         methods:
+      #           - GET
+      #           - POST
+      #           - PUT
+      #           - PATCH
+      #           - DELETE
 
 # services:
 #   nestjs:
