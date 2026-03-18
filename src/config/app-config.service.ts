@@ -44,7 +44,7 @@ export class AppConfigService {
       appSecret: this.configService.getOrThrow<string>('FEISHU_APP_SECRET'),
       webhookPath: this.configService.get<string>(
         'FEISHU_WEBHOOK_PATH',
-        '/feishu/webhook',
+        '/api/feishu/webhook',
       ),
       verificationToken: this.configService.getOrThrow<string>(
         'FEISHU_VERIFICATION_TOKEN',
