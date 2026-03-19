@@ -142,35 +142,7 @@ Jarvis 的核心思路是：**每个业务域在 Bitable 中有一个 App（appT
 
 ## Roadmap（按“纯 API + Bitable 存储”落地）
 
-### A. 快递取件管理（Express Pickup）—— 纯 API
-
-**目标**：记录包裹、查询待取、更新状态、基础统计。
-
-建议 Bitable 表（示例）：
-
-- 表：`express_packages`
-  - `id`（服务内逻辑 id，可映射到 record_id）
-  - `carrier`（快递公司）
-  - `tracking_no`（运单号，可选）
-  - `pickup_code`（取件码）
-  - `station`（驿站/柜机）
-  - `receiver`（收件人）
-  - `phone_tail`（手机号尾号，可选）
-  - `status`（`pending | picked | expired`）
-  - `arrived_at`（到件时间）
-  - `picked_at`（取件时间，可选）
-  - `remark`（备注）
-
-建议 API（规划）：
-
-- `POST /api/express/packages` 新增到件
-- `GET /api/express/packages` 列表查询（支持 status / 时间范围 / 关键字）
-- `GET /api/express/packages/:id` 详情
-- `PATCH /api/express/packages/:id` 更新信息
-- `POST /api/express/packages/:id/pick` 标记已取件
-- `POST /api/express/packages/:id/expire` 标记过期（可选：定时任务）
-
-### B. 家庭财务（Finance）—— 纯 API
+### A. 家庭财务（Finance）—— 纯 API
 
 建议 Bitable 表（示例）：
 
