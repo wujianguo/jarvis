@@ -1,0 +1,86 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { FeishuHttpService } from '../http/feishu-http.service';
+
+export interface TaskAssignee {
+  id: string;
+  type: 'user';
+}
+
+export interface CreateTaskPayload {
+  summary: string;
+  description?: string;
+  assignee_ids?: TaskAssignee[];
+}
+
+export interface UpdateTaskPayload {
+  summary?: string;
+  description?: string;
+  assignee_ids?: TaskAssignee[];
+  completed_at?: string;
+}
+
+interface CreateTaskResponse {
+  task: {
+    guid: string;
+    [key: string]: unknown;
+  };
+}
+
+interface UpdateTaskResponse {
+  task: {
+    guid: string;
+    [key: string]: unknown;
+  };
+}
+
+@Injectable()
+export class FeishuTaskService {
+  constructor(private readonly http: FeishuHttpService) {}
+
+  async createTask(payload: CreateTaskPayload): Promise<string> {
+    const body: Record<string, unknown> = {
+      summary: payload.summary,
+    };
+    if (payload.description !== undefined) {
+      body.description = payload.description;
+    }
+    if (payload.assignee_ids && payload.assignee_ids.length > 0) {
+      body.assignee_ids = payload.assignee_ids;
+    }
+    const response = await this.http.post<CreateTaskResponse>(
+      '/open-apis/task/v2/tasks',
+      body,
+      { params: { user_id_type: 'user_id' } },
+    );
+    const taskGuid = response.data.data?.task?.guid;
+    if (!taskGuid) {
+      throw new InternalServerErrorException(
+        'Feishu Task API did not return a task guid',
+      );
+    }
+    return taskGuid;
+  }
+
+  async updateTask(
+    taskGuid: string,
+    payload: UpdateTaskPayload,
+  ): Promise<void> {
+    const task: Record<string, unknown> = {};
+    if (payload.summary !== undefined) task.summary = payload.summary;
+    if (payload.description !== undefined)
+      task.description = payload.description;
+    if (payload.assignee_ids !== undefined)
+      task.assignee_ids = payload.assignee_ids;
+    if (payload.completed_at !== undefined)
+      task.completed_at = payload.completed_at;
+
+    const updateFields = Object.keys(task);
+    if (updateFields.length === 0) return;
+
+    await this.http.patch<UpdateTaskResponse>(
+      `/open-apis/task/v2/tasks/${taskGuid}`,
+      { task, update_fields: updateFields },
+      { params: { user_id_type: 'user_id' } },
+    );
+  }
+}

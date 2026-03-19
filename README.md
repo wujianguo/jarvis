@@ -81,9 +81,10 @@ FEISHU_BASE_URL=https://open.feishu.cn
 # 业务 Webhook 路径（可选，默认 /api/feishu/webhook）
 FEISHU_WEBHOOK_PATH=/api/feishu/webhook
 
-# Bitable “数据库名称 -> appToken” 映射（建议必填）
+# Bitable “数据库名称 -> appToken + tables” 映射（建议必填）
+# tables 字段映射逻辑表名到 Bitable tableId，列名在代码中写死。
 # 示例：
-# FEISHU_BITABLE_DATABASES_JSON={"home":{"appToken":"bascnxxxxxxxx"},"finance":{"appToken":"bascnyyyyyyyy"}}
+# FEISHU_BITABLE_DATABASES_JSON={"home":{"appToken":"bascnxxxxxxxx","tables":{"express_pickups":{"tableId":"tblxxxxxxxx"},"express_assignees":{"tableId":"tblyyyyyyyy"}}}}
 FEISHU_BITABLE_DATABASES_JSON={}
 ```
 
@@ -123,13 +124,19 @@ Jarvis 的核心思路是：**每个业务域在 Bitable 中有一个 App（appT
 
 - `GET /api/system/health`：健康检查
 
-### Feishu Webhook（目前是基础设施，业务 API 模式下可选）
+### Express 快递取件管理
+
+- `POST /api/express/pickups` — 创建取件记录（写入 Bitable + 创建飞书任务 + 回写 task_id）
+- `GET /api/express/pickups` — 查询取件记录列表
+- `GET /api/express/pickups/:id` — 查询单条取件记录
+- `PATCH /api/express/pickups/:id` — 更新取件记录（同步更新飞书任务）
+
+### Feishu Webhook
 
 - `POST /api/feishu/webhook`
   - 支持 `url_verification` challenge
-  - 支持 schema 2.0 事件接收并按 `event_type` 分发（Dispatcher 框架已就绪）
-
-> 由于你选择“纯 API”，这部分可用于内部自动化（例如：表变更触发同步），但不是核心功能路径。
+  - 支持 schema 2.0 事件接收并按 `event_type` 分发
+  - 支持 `task.task.update_tenant_v1` 事件：任务完成时自动回写取件记录 `status=done`
 
 ---
 

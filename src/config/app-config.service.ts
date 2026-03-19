@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+export interface BitableTableConfig {
+  tableId: string;
+}
+
 export interface BitableDatabaseConfig {
   appToken: string;
+  tables?: Record<string, BitableTableConfig>;
 }
 
 @Injectable()
