@@ -147,4 +147,27 @@ export class FeishuHttpService {
     }
     return response;
   }
+
+  async patch<T>(
+    path: string,
+    body?: unknown,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<FeishuApiResponse<T>>> {
+    const headers = await this.buildHeaders();
+    const response = await firstValueFrom(
+      this.httpService.patch<FeishuApiResponse<T>>(
+        `${this.baseUrl}${path}`,
+        body,
+        {
+          ...config,
+          headers: { ...headers, ...(config?.headers ?? {}) },
+          timeout: 10000,
+        },
+      ),
+    );
+    if (response.data.code !== 0) {
+      this.throwFeishuError(response.data.code, response.data.msg);
+    }
+    return response;
+  }
 }

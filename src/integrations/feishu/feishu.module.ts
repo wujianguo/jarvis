@@ -8,6 +8,8 @@ import { FeishuSheetsService } from './sheets/feishu-sheets.service';
 import { FeishuStorageService } from './storage/feishu-storage.service';
 import { FeishuEventDispatcher } from './webhook/feishu-event.dispatcher';
 import { FeishuWebhookController } from './webhook/feishu-webhook.controller';
+import { FeishuTaskService } from './task/feishu-task.service';
+import { FeishuTaskEventHandler } from './task/feishu-task-event.handler';
 
 @Module({
   imports: [HttpModule, KvModule],
@@ -18,6 +20,8 @@ import { FeishuWebhookController } from './webhook/feishu-webhook.controller';
     FeishuSheetsService,
     FeishuStorageService,
     FeishuEventDispatcher,
+    FeishuTaskService,
+    FeishuTaskEventHandler,
   ],
   controllers: [FeishuWebhookController],
   exports: [
@@ -27,6 +31,7 @@ import { FeishuWebhookController } from './webhook/feishu-webhook.controller';
     FeishuSheetsService,
     FeishuStorageService,
     FeishuEventDispatcher,
+    FeishuTaskService,
   ],
 })
 export class FeishuModule {}
