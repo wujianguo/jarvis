@@ -11,17 +11,28 @@ import {
 import { CreateExpressPickupDto } from './dto/create-express-pickup.dto';
 import { UpdateExpressPickupDto } from './dto/update-express-pickup.dto';
 import { ExpressPickupDto } from './dto/express-pickup.dto';
+import { ExpressPickupStatus } from './express-pickup-status.enum';
+import { toIso8601Beijing } from '../../common/time/beijing-time';
 
-// Bitable column names (hardcoded)
-const COL_RAW_INFO = 'raw_info';
-const COL_ADDRESS = 'address';
-const COL_PICKUP_CODE = 'pickup_code';
-const COL_TASK_ID = 'task_id';
-const COL_STATUS = 'status';
+// Bitable column names for express_pickups (Chinese)
+const COL_RAW_INFO = '原始信息';
+const COL_ADDRESS = '取件地址';
+const COL_PICKUP_CODE = '取件码';
+const COL_TASK_ID = '任务ID';
+const COL_STATUS = '状态';
+const COL_CREATED_AT = '创建时间';
+const COL_UPDATED_AT = '更新时间';
 
-// Assignees table column names (hardcoded)
+// Assignees table column names (unchanged)
 const COL_USER_ID = 'user_id';
 const COL_ENABLED = 'enabled';
+
+/** Map a raw Bitable string value to the status enum, defaulting to Pending. */
+function parseStatus(value: string): ExpressPickupStatus {
+  return (Object.values(ExpressPickupStatus) as string[]).includes(value)
+    ? (value as ExpressPickupStatus)
+    : ExpressPickupStatus.Pending;
+}
 
 @Injectable()
 export class ExpressPickupsService {
@@ -61,13 +72,18 @@ export class ExpressPickupsService {
   private recordToDto(record: BitableRecord): ExpressPickupDto {
     const f = record.fields;
     const toStr = (v: unknown): string => (typeof v === 'string' ? v : '');
+    // Fall back to Date.now() for records created before the timestamp fields were added.
+    const toMs = (v: unknown): number =>
+      typeof v === 'number' ? v : Date.now();
     return {
       id: record.record_id,
       rawInfo: toStr(f[COL_RAW_INFO]),
       address: toStr(f[COL_ADDRESS]),
       pickupCode: toStr(f[COL_PICKUP_CODE]),
       taskId: typeof f[COL_TASK_ID] === 'string' ? f[COL_TASK_ID] : undefined,
-      status: toStr(f[COL_STATUS]) || 'pending',
+      status: parseStatus(toStr(f[COL_STATUS])),
+      createdAt: toIso8601Beijing(toMs(f[COL_CREATED_AT])),
+      updatedAt: toIso8601Beijing(toMs(f[COL_UPDATED_AT])),
     };
   }
 
@@ -94,6 +110,7 @@ export class ExpressPickupsService {
   }
 
   async create(dto: CreateExpressPickupDto): Promise<ExpressPickupDto> {
+    const now = Date.now();
     // 1. Write to Bitable
     const record = await this.bitable
       .db('home')
@@ -102,7 +119,9 @@ export class ExpressPickupsService {
         [COL_RAW_INFO]: dto.rawInfo,
         [COL_ADDRESS]: dto.address,
         [COL_PICKUP_CODE]: dto.pickupCode,
-        [COL_STATUS]: 'pending',
+        [COL_STATUS]: ExpressPickupStatus.Pending,
+        [COL_CREATED_AT]: now,
+        [COL_UPDATED_AT]: now,
       });
 
     // 2. Get assignees
@@ -136,7 +155,9 @@ export class ExpressPickupsService {
       address: dto.address,
       pickupCode: dto.pickupCode,
       taskId,
-      status: 'pending',
+      status: ExpressPickupStatus.Pending,
+      createdAt: toIso8601Beijing(now),
+      updatedAt: toIso8601Beijing(now),
     };
   }
 
@@ -158,6 +179,7 @@ export class ExpressPickupsService {
 
     let updatedRecord = existing;
     if (Object.keys(updatedFields).length > 0) {
+      updatedFields[COL_UPDATED_AT] = Date.now();
       updatedRecord = await this.bitable
         .db('home')
         .table(this.pickupsTableId)
@@ -195,11 +217,15 @@ export class ExpressPickupsService {
     return this.recordToDto(updatedRecord);
   }
 
-  async findAll(): Promise<ExpressPickupDto[]> {
+  async findAll(
+    status: ExpressPickupStatus = ExpressPickupStatus.Pending,
+  ): Promise<ExpressPickupDto[]> {
     const result = await this.bitable
       .db('home')
       .table(this.pickupsTableId)
-      .listRecords();
+      .listRecords({
+        filter: `CurrentValue.[${COL_STATUS}] = "${status}"`,
+      });
     return result.items.map((r) => this.recordToDto(r));
   }
 

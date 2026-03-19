@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ExpressPickupStatus } from '../express-pickup-status.enum';
 
 export class ExpressPickupDto {
   @ApiProperty({ description: '取件记录 ID' })
@@ -16,6 +17,12 @@ export class ExpressPickupDto {
   @ApiPropertyOptional({ description: '关联飞书任务 ID' })
   taskId?: string;
 
-  @ApiProperty({ description: '状态', example: 'pending' })
-  status: string;
+  @ApiProperty({ description: '状态', enum: ExpressPickupStatus })
+  status: ExpressPickupStatus;
+
+  @ApiProperty({ description: '创建时间（ISO8601 +08:00）' })
+  createdAt: string;
+
+  @ApiProperty({ description: '更新时间（ISO8601 +08:00）' })
+  updatedAt: string;
 }
