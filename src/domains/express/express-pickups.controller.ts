@@ -1,9 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ExpressPickupsService } from './express-pickups.service';
 import { CreateExpressPickupDto } from './dto/create-express-pickup.dto';
 import { UpdateExpressPickupDto } from './dto/update-express-pickup.dto';
 import { ExpressPickupDto } from './dto/express-pickup.dto';
+import { ExpressPickupStatus } from './express-pickup-status.enum';
 
 @ApiTags('express')
 @Controller('express/pickups')
@@ -23,13 +38,21 @@ export class ExpressPickupsController {
 
   @Get()
   @ApiOperation({ summary: '查询快递取件记录列表' })
+  @ApiQuery({
+    name: 'status',
+    enum: ExpressPickupStatus,
+    required: false,
+    description: '按状态筛选，默认为未取件',
+  })
   @ApiResponse({
     status: 200,
     type: [ExpressPickupDto],
     description: '记录列表',
   })
-  findAll(): Promise<ExpressPickupDto[]> {
-    return this.service.findAll();
+  findAll(
+    @Query('status') status?: ExpressPickupStatus,
+  ): Promise<ExpressPickupDto[]> {
+    return this.service.findAll(status);
   }
 
   @Get(':id')

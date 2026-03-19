@@ -7,6 +7,13 @@ import { FeishuBitableService } from '../src/integrations/feishu/bitable/feishu-
 import { FeishuTaskService } from '../src/integrations/feishu/task/feishu-task.service';
 import { FeishuEventDispatcher } from '../src/integrations/feishu/webhook/feishu-event.dispatcher';
 import { AppConfigService } from '../src/config/app-config.service';
+import { ExpressPickupStatus } from '../src/domains/express/express-pickup-status.enum';
+
+// ISO 8601 with +08:00 timezone offset
+const ISO8601_BEIJING_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+08:00$/;
+
+const FIXED_MS = 1710000000000; // 2024-03-09T20:00:00.000+08:00 (used in test mocks)
 
 describe('ExpressPickups (e2e)', () => {
   let app: INestApplication<App>;
@@ -120,10 +127,12 @@ describe('ExpressPickups (e2e)', () => {
       const createdRecord = {
         record_id: 'rec_001',
         fields: {
-          raw_info: '您有一个快递',
-          address: '驿站A',
-          pickup_code: '12345',
-          status: 'pending',
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '12345',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
         },
       };
 
@@ -136,7 +145,7 @@ describe('ExpressPickups (e2e)', () => {
       mockTaskService.createTask.mockResolvedValueOnce('task_guid_001');
       mockTableAccessor.updateRecord.mockResolvedValueOnce({
         ...createdRecord,
-        fields: { ...createdRecord.fields, task_id: 'task_guid_001' },
+        fields: { ...createdRecord.fields, 任务ID: 'task_guid_001' },
       });
 
       const response = await request(app.getHttpServer())
@@ -155,13 +164,17 @@ describe('ExpressPickups (e2e)', () => {
         pickupCode: string;
         status: string;
         taskId?: string;
+        createdAt: string;
+        updatedAt: string;
       };
       expect(body.id).toBe('rec_001');
       expect(body.rawInfo).toBe('您有一个快递');
       expect(body.address).toBe('驿站A');
       expect(body.pickupCode).toBe('12345');
-      expect(body.status).toBe('pending');
+      expect(body.status).toBe(ExpressPickupStatus.Pending);
       expect(body.taskId).toBe('task_guid_001');
+      expect(body.createdAt).toMatch(ISO8601_BEIJING_RE);
+      expect(body.updatedAt).toMatch(ISO8601_BEIJING_RE);
     });
   });
 
@@ -170,16 +183,18 @@ describe('ExpressPickups (e2e)', () => {
       const existingRecord = {
         record_id: 'rec_001',
         fields: {
-          raw_info: '您有一个快递',
-          address: '驿站A',
-          pickup_code: '12345',
-          task_id: 'task_guid_001',
-          status: 'pending',
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '12345',
+          任务ID: 'task_guid_001',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
         },
       };
       const updatedRecord = {
         ...existingRecord,
-        fields: { ...existingRecord.fields, address: '驿站B' },
+        fields: { ...existingRecord.fields, 取件地址: '驿站B' },
       };
 
       mockTableAccessor.getRecord.mockResolvedValueOnce(existingRecord);
@@ -196,9 +211,96 @@ describe('ExpressPickups (e2e)', () => {
         .send({ address: '驿站B' })
         .expect(200);
 
-      const body = response.body as { id: string; address: string };
+      const body = response.body as {
+        id: string;
+        address: string;
+        createdAt: string;
+        updatedAt: string;
+      };
       expect(body.id).toBe('rec_001');
       expect(body.address).toBe('驿站B');
+      expect(body.createdAt).toMatch(ISO8601_BEIJING_RE);
+      expect(body.updatedAt).toMatch(ISO8601_BEIJING_RE);
+    });
+  });
+
+  describe('GET /express/pickups', () => {
+    it('should filter by 未取件 by default', async () => {
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [
+          {
+            record_id: 'rec_001',
+            fields: {
+              原始信息: '快递1',
+              取件地址: '驿站A',
+              取件码: '111',
+              状态: ExpressPickupStatus.Pending,
+              创建时间: FIXED_MS,
+              更新时间: FIXED_MS,
+            },
+          },
+        ],
+        has_more: false,
+        total: 1,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/express/pickups')
+        .expect(200);
+
+      expect(mockTableAccessor.listRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filter: expect.stringContaining(
+            ExpressPickupStatus.Pending,
+          ) as unknown,
+        }),
+      );
+
+      const body = response.body as Array<{
+        status: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      expect(body).toHaveLength(1);
+      expect(body[0].status).toBe(ExpressPickupStatus.Pending);
+      expect(body[0].createdAt).toMatch(ISO8601_BEIJING_RE);
+      expect(body[0].updatedAt).toMatch(ISO8601_BEIJING_RE);
+    });
+
+    it('should filter by 已取件 when status=已取件', async () => {
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [
+          {
+            record_id: 'rec_002',
+            fields: {
+              原始信息: '快递2',
+              取件地址: '驿站B',
+              取件码: '222',
+              状态: ExpressPickupStatus.Done,
+              创建时间: FIXED_MS,
+              更新时间: FIXED_MS,
+            },
+          },
+        ],
+        has_more: false,
+        total: 1,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(
+          `/express/pickups?status=${encodeURIComponent(ExpressPickupStatus.Done)}`,
+        )
+        .expect(200);
+
+      expect(mockTableAccessor.listRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filter: expect.stringContaining(ExpressPickupStatus.Done) as unknown,
+        }),
+      );
+
+      const body = response.body as Array<{ status: string }>;
+      expect(body).toHaveLength(1);
+      expect(body[0].status).toBe(ExpressPickupStatus.Done);
     });
   });
 });
@@ -284,7 +386,7 @@ describe('ExpressPickups Webhook (e2e)', () => {
     await app.close();
   });
 
-  it('should update Bitable record to done when task.task.update_tenant_v1 received with completed_at', async () => {
+  it('should update Bitable record to 已取件 when task.task.update_tenant_v1 received with completed_at', async () => {
     const taskGuid = 'task_guid_001';
     const recordId = 'rec_001';
 
@@ -292,7 +394,7 @@ describe('ExpressPickups Webhook (e2e)', () => {
       items: [
         {
           record_id: recordId,
-          fields: { task_id: taskGuid, status: 'pending' },
+          fields: { 任务ID: taskGuid, 状态: ExpressPickupStatus.Pending },
         },
       ],
       has_more: false,
@@ -300,7 +402,7 @@ describe('ExpressPickups Webhook (e2e)', () => {
     });
     mockTableAccessor.updateRecord.mockResolvedValueOnce({
       record_id: recordId,
-      fields: { task_id: taskGuid, status: 'done' },
+      fields: { 任务ID: taskGuid, 状态: ExpressPickupStatus.Done },
     });
 
     await dispatcher.dispatch('task.task.update_tenant_v1', {
@@ -317,7 +419,7 @@ describe('ExpressPickups Webhook (e2e)', () => {
     );
     expect(mockTableAccessor.updateRecord).toHaveBeenCalledWith(
       recordId,
-      expect.objectContaining({ status: 'done' }),
+      expect.objectContaining({ 状态: ExpressPickupStatus.Done }),
     );
   });
 

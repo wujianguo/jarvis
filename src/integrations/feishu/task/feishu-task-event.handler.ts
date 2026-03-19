@@ -5,6 +5,7 @@ import {
 } from '../webhook/feishu-event.dispatcher';
 import { FeishuBitableService } from '../bitable/feishu-bitable.service';
 import { AppConfigService } from '../../../config/app-config.service';
+import { ExpressPickupStatus } from '../../../domains/express/express-pickup-status.enum';
 
 interface TaskUpdateEvent {
   task?: {
@@ -65,10 +66,10 @@ export class FeishuTaskEventHandler
       const result = await this.bitable
         .db('home')
         .table(tableId)
-        .listRecords({ filter: `CurrentValue.[task_id] = "${taskGuid}"` });
+        .listRecords({ filter: `CurrentValue.[任务ID] = "${taskGuid}"` });
 
       if (result.items.length === 0) {
-        this.logger.warn(`No express pickup found for task_id=${taskGuid}`);
+        this.logger.warn(`No express pickup found for 任务ID=${taskGuid}`);
         return;
       }
 
@@ -77,15 +78,16 @@ export class FeishuTaskEventHandler
         .db('home')
         .table(tableId)
         .updateRecord(record.record_id, {
-          status: 'done',
+          状态: ExpressPickupStatus.Done,
+          更新时间: Date.now(),
         });
 
       this.logger.log(
-        `Updated express pickup ${record.record_id} to status=done (task_id=${taskGuid})`,
+        `Updated express pickup ${record.record_id} to 状态=已取件 (任务ID=${taskGuid})`,
       );
     } catch (err) {
       this.logger.error(
-        `Failed to update express pickup for task_id=${taskGuid}: ${String(err)}`,
+        `Failed to update express pickup for 任务ID=${taskGuid}: ${String(err)}`,
       );
     }
   }
