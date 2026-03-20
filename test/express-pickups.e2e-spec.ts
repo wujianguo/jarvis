@@ -176,6 +176,47 @@ describe('ExpressPickups (e2e)', () => {
       expect(body.createdAt).toMatch(ISO8601_BEIJING_RE);
       expect(body.updatedAt).toMatch(ISO8601_BEIJING_RE);
     });
+
+    it('should pass members with role assignee to createTask', async () => {
+      const createdRecord = {
+        record_id: 'rec_002',
+        fields: {
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '99999',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
+        },
+      };
+
+      mockTableAccessor.createRecord.mockResolvedValueOnce(createdRecord);
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [{ record_id: 'a_001', fields: { user_id: 'ou_abc123' } }],
+        has_more: false,
+        total: 1,
+      });
+      mockTaskService.createTask.mockResolvedValueOnce('task_guid_002');
+      mockTableAccessor.updateRecord.mockResolvedValueOnce({
+        ...createdRecord,
+        fields: { ...createdRecord.fields, 任务ID: 'task_guid_002' },
+      });
+
+      await request(app.getHttpServer())
+        .post('/express/pickups')
+        .send({
+          rawInfo: '您有一个快递',
+          address: '驿站A',
+          pickupCode: '99999',
+        })
+        .expect(201);
+
+      expect(mockTaskService.createTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          members: [{ id: 'ou_abc123', type: 'user', role: 'assignee' }],
+        }),
+      );
+    });
   });
 
   describe('PATCH /express/pickups/:id', () => {
