@@ -6,7 +6,7 @@ import {
 } from '../../integrations/feishu/bitable/feishu-bitable.service';
 import {
   FeishuTaskService,
-  TaskAssignee,
+  TaskMember,
 } from '../../integrations/feishu/task/feishu-task.service';
 import { CreateExpressPickupDto } from './dto/create-express-pickup.dto';
 import { UpdateExpressPickupDto } from './dto/update-express-pickup.dto';
@@ -87,11 +87,11 @@ export class ExpressPickupsService {
     };
   }
 
-  private async getAssignees(): Promise<TaskAssignee[]> {
+  private async getAssignees(): Promise<TaskMember[]> {
     try {
       const tableId = this.assigneesTableId;
       const result = await this.bitable.db('home').table(tableId).listRecords();
-      const assignees: TaskAssignee[] = [];
+      const assignees: TaskMember[] = [];
       for (const record of result.items) {
         const userId = record.fields[COL_USER_ID];
         // If enabled column exists, only include enabled records
@@ -99,7 +99,7 @@ export class ExpressPickupsService {
           if (!record.fields[COL_ENABLED]) continue;
         }
         if (typeof userId === 'string' && userId) {
-          assignees.push({ id: userId, type: 'user' });
+          assignees.push({ id: userId, type: 'user', role: 'assignee' });
         }
       }
       return assignees;
@@ -133,7 +133,7 @@ export class ExpressPickupsService {
       taskId = await this.taskService.createTask({
         summary: `取件：${dto.address} - ${dto.pickupCode}`,
         description: dto.rawInfo,
-        assignee_ids: assignees,
+        members: assignees,
       });
 
       // 4. Write task_id back to Bitable record
@@ -205,7 +205,7 @@ export class ExpressPickupsService {
         await this.taskService.updateTask(taskId, {
           summary: `取件：${mergedAddress} - ${mergedPickupCode}`,
           description: mergedRawInfo,
-          assignee_ids: assignees,
+          members: assignees,
         });
       } catch (err) {
         this.logger.error(

@@ -1,21 +1,22 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { FeishuHttpService } from '../http/feishu-http.service';
 
-export interface TaskAssignee {
+export interface TaskMember {
   id: string;
   type: 'user';
+  role: 'assignee' | 'follower';
 }
 
 export interface CreateTaskPayload {
   summary: string;
   description?: string;
-  assignee_ids?: TaskAssignee[];
+  members?: TaskMember[];
 }
 
 export interface UpdateTaskPayload {
   summary?: string;
   description?: string;
-  assignee_ids?: TaskAssignee[];
+  members?: TaskMember[];
   completed_at?: string;
 }
 
@@ -44,8 +45,8 @@ export class FeishuTaskService {
     if (payload.description !== undefined) {
       body.description = payload.description;
     }
-    if (payload.assignee_ids && payload.assignee_ids.length > 0) {
-      body.assignee_ids = payload.assignee_ids;
+    if (payload.members && payload.members.length > 0) {
+      body.members = payload.members;
     }
     const response = await this.http.post<CreateTaskResponse>(
       '/open-apis/task/v2/tasks',
@@ -69,8 +70,7 @@ export class FeishuTaskService {
     if (payload.summary !== undefined) task.summary = payload.summary;
     if (payload.description !== undefined)
       task.description = payload.description;
-    if (payload.assignee_ids !== undefined)
-      task.assignee_ids = payload.assignee_ids;
+    if (payload.members !== undefined) task.members = payload.members;
     if (payload.completed_at !== undefined)
       task.completed_at = payload.completed_at;
 
