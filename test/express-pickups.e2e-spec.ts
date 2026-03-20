@@ -476,3 +476,309 @@ describe('ExpressPickups Webhook (e2e)', () => {
     expect(mockTableAccessor.updateRecord).not.toHaveBeenCalled();
   });
 });
+
+describe('ExpressPickups MarkDone (e2e)', () => {
+  let app: INestApplication<App>;
+
+  const mockTableAccessor = {
+    listRecords: jest.fn(),
+    getRecord: jest.fn(),
+    createRecord: jest.fn(),
+    updateRecord: jest.fn(),
+    deleteRecord: jest.fn(),
+    batchCreateRecords: jest.fn(),
+  };
+
+  const mockBitableDb = {
+    table: jest.fn().mockReturnValue(mockTableAccessor),
+  };
+
+  const mockBitableService = {
+    db: jest.fn().mockReturnValue(mockBitableDb),
+    dbByToken: jest.fn(),
+  };
+
+  const mockTaskService = {
+    createTask: jest.fn(),
+    updateTask: jest.fn(),
+  };
+
+  const mockConfigService = {
+    port: 9000,
+    kv: { baseUrl: 'http://kv', apiToken: 'token' },
+    feishu: {
+      baseUrl: 'https://open.feishu.cn',
+      appId: 'app_id',
+      appSecret: 'secret',
+      webhookPath: '/api/feishu/webhook',
+      verificationToken: 'test-token',
+      bitable: {
+        databases: {
+          home: {
+            appToken: 'bascn_test',
+            tables: {
+              express_pickups: { tableId: 'tbl_pickups' },
+              express_assignees: { tableId: 'tbl_assignees' },
+            },
+          },
+        },
+      },
+      sheets: {},
+    },
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(FeishuBitableService)
+      .useValue(mockBitableService)
+      .overrideProvider(FeishuTaskService)
+      .useValue(mockTaskService)
+      .overrideProvider(AppConfigService)
+      .useValue(mockConfigService)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  describe('POST /express/pickups/:id/done', () => {
+    it('should update Bitable record status to 已取件 and call updateTask with completed_at', async () => {
+      const existingRecord = {
+        record_id: 'rec_001',
+        fields: {
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '12345',
+          任务ID: 'task_guid_001',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
+        },
+      };
+      const updatedRecord = {
+        ...existingRecord,
+        fields: {
+          ...existingRecord.fields,
+          状态: ExpressPickupStatus.Done,
+          更新时间: FIXED_MS + 1000,
+        },
+      };
+
+      mockTableAccessor.getRecord.mockResolvedValueOnce(existingRecord);
+      mockTableAccessor.updateRecord.mockResolvedValueOnce(updatedRecord);
+      mockTaskService.updateTask.mockResolvedValueOnce(undefined);
+
+      const response = await request(app.getHttpServer())
+        .post('/express/pickups/rec_001/done')
+        .expect(201);
+
+      const body = response.body as { id: string; status: string };
+      expect(body.id).toBe('rec_001');
+      expect(body.status).toBe(ExpressPickupStatus.Done);
+
+      expect(mockTableAccessor.updateRecord).toHaveBeenCalledWith(
+        'rec_001',
+        expect.objectContaining({ 状态: ExpressPickupStatus.Done }),
+      );
+      expect(mockTaskService.updateTask).toHaveBeenCalledWith(
+        'task_guid_001',
+        expect.objectContaining({
+          completed_at: expect.any(String) as unknown,
+        }),
+      );
+    });
+
+    it('should still succeed and not throw when record is already Done (idempotent)', async () => {
+      const alreadyDoneRecord = {
+        record_id: 'rec_002',
+        fields: {
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '99999',
+          任务ID: 'task_guid_002',
+          状态: ExpressPickupStatus.Done,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
+        },
+      };
+
+      mockTableAccessor.getRecord.mockResolvedValueOnce(alreadyDoneRecord);
+      mockTableAccessor.updateRecord.mockResolvedValueOnce(alreadyDoneRecord);
+      mockTaskService.updateTask.mockResolvedValueOnce(undefined);
+
+      const response = await request(app.getHttpServer())
+        .post('/express/pickups/rec_002/done')
+        .expect(201);
+
+      const body = response.body as { id: string; status: string };
+      expect(body.id).toBe('rec_002');
+      expect(body.status).toBe(ExpressPickupStatus.Done);
+    });
+
+    it('should not call updateTask when record has no taskId', async () => {
+      const existingRecord = {
+        record_id: 'rec_003',
+        fields: {
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: '55555',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
+        },
+      };
+      const updatedRecord = {
+        ...existingRecord,
+        fields: { ...existingRecord.fields, 状态: ExpressPickupStatus.Done },
+      };
+
+      mockTableAccessor.getRecord.mockResolvedValueOnce(existingRecord);
+      mockTableAccessor.updateRecord.mockResolvedValueOnce(updatedRecord);
+
+      await request(app.getHttpServer())
+        .post('/express/pickups/rec_003/done')
+        .expect(201);
+
+      expect(mockTaskService.updateTask).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /express/pickups/done-by-code', () => {
+    it('should return 400 when pickupCode is missing', () => {
+      return request(app.getHttpServer())
+        .post('/express/pickups/done-by-code')
+        .send({})
+        .expect(400);
+    });
+
+    it('should return 400 when pickupCode is empty string', () => {
+      return request(app.getHttpServer())
+        .post('/express/pickups/done-by-code')
+        .send({ pickupCode: '' })
+        .expect(400);
+    });
+
+    it('should return 404 when no pending record matches the pickupCode', async () => {
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [],
+        has_more: false,
+        total: 0,
+      });
+
+      await request(app.getHttpServer())
+        .post('/express/pickups/done-by-code')
+        .send({ pickupCode: 'NONEXISTENT' })
+        .expect(404);
+    });
+
+    it('should mark the single matching pending record as done', async () => {
+      const pendingRecord = {
+        record_id: 'rec_010',
+        fields: {
+          原始信息: '您有一个快递',
+          取件地址: '驿站A',
+          取件码: 'CODE001',
+          任务ID: 'task_guid_010',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS,
+        },
+      };
+      const updatedRecord = {
+        ...pendingRecord,
+        fields: { ...pendingRecord.fields, 状态: ExpressPickupStatus.Done },
+      };
+
+      // listRecords call for done-by-code search
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [pendingRecord],
+        has_more: false,
+        total: 1,
+      });
+      // getRecord call inside markDone
+      mockTableAccessor.getRecord.mockResolvedValueOnce(pendingRecord);
+      // updateRecord call inside markDone
+      mockTableAccessor.updateRecord.mockResolvedValueOnce(updatedRecord);
+      mockTaskService.updateTask.mockResolvedValueOnce(undefined);
+
+      const response = await request(app.getHttpServer())
+        .post('/express/pickups/done-by-code')
+        .send({ pickupCode: 'CODE001' })
+        .expect(201);
+
+      const body = response.body as { id: string; status: string };
+      expect(body.id).toBe('rec_010');
+      expect(body.status).toBe(ExpressPickupStatus.Done);
+    });
+
+    it('should pick the record with the greatest 更新时间 when multiple pending records match', async () => {
+      const olderRecord = {
+        record_id: 'rec_020',
+        fields: {
+          原始信息: '快递A',
+          取件地址: '驿站A',
+          取件码: 'MULTI',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS, // older
+        },
+      };
+      const newerRecord = {
+        record_id: 'rec_021',
+        fields: {
+          原始信息: '快递B',
+          取件地址: '驿站B',
+          取件码: 'MULTI',
+          状态: ExpressPickupStatus.Pending,
+          创建时间: FIXED_MS,
+          更新时间: FIXED_MS + 5000, // newer
+        },
+      };
+      const updatedRecord = {
+        ...newerRecord,
+        fields: { ...newerRecord.fields, 状态: ExpressPickupStatus.Done },
+      };
+
+      // listRecords returns both records; order shouldn't matter for the selection logic
+      mockTableAccessor.listRecords.mockResolvedValueOnce({
+        items: [olderRecord, newerRecord],
+        has_more: false,
+        total: 2,
+      });
+      // getRecord is called with the id of the newest record
+      mockTableAccessor.getRecord.mockResolvedValueOnce(newerRecord);
+      mockTableAccessor.updateRecord.mockResolvedValueOnce(updatedRecord);
+      mockTaskService.updateTask.mockResolvedValueOnce(undefined);
+
+      const response = await request(app.getHttpServer())
+        .post('/express/pickups/done-by-code')
+        .send({ pickupCode: 'MULTI' })
+        .expect(201);
+
+      const body = response.body as { id: string; status: string };
+      // The newer record (rec_021) should be marked done
+      expect(body.id).toBe('rec_021');
+      expect(body.status).toBe(ExpressPickupStatus.Done);
+      // updateRecord should have been called with the newer record's id
+      expect(mockTableAccessor.updateRecord).toHaveBeenCalledWith(
+        'rec_021',
+        expect.objectContaining({ 状态: ExpressPickupStatus.Done }),
+      );
+    });
+  });
+});

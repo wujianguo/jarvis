@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+
 import { AppConfigService } from '../../config/app-config.service';
 import {
   FeishuBitableService,
@@ -235,5 +236,90 @@ export class ExpressPickupsService {
       .table(this.pickupsTableId)
       .getRecord(id);
     return this.recordToDto(record);
+  }
+
+  /**
+   * Mark a pickup record as done by its record id.
+   * Idempotent: if the record is already Done the status update is still
+   * written (no-op in Bitable) and task completion is still attempted.
+   * If the record has a 任务ID the Feishu task is completed via updateTask.
+   */
+  async markDone(id: string): Promise<ExpressPickupDto> {
+    // Fetch existing record – throws NotFoundException if absent.
+    const existing = await this.bitable
+      .db('home')
+      .table(this.pickupsTableId)
+      .getRecord(id);
+
+    const now = Date.now();
+    const updatedRecord = await this.bitable
+      .db('home')
+      .table(this.pickupsTableId)
+      .updateRecord(id, {
+        [COL_STATUS]: ExpressPickupStatus.Done,
+        [COL_UPDATED_AT]: now,
+      });
+
+    // Complete the linked Feishu task if a taskId is present.
+    const rawTaskId = existing.fields[COL_TASK_ID];
+    const taskId = typeof rawTaskId === 'string' ? rawTaskId : undefined;
+    if (taskId) {
+      try {
+        await this.taskService.updateTask(taskId, {
+          completed_at: String(now),
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to complete Feishu task ${taskId} for pickup ${id}: ${String(err)}`,
+        );
+      }
+    }
+
+    return this.recordToDto(updatedRecord);
+  }
+
+  /**
+   * Mark a pickup record as done by pickup code.
+   * Searches for pending records (状态=未取件) whose 取件码 matches the
+   * given code.  When multiple pending records match the "latest" one is
+   * chosen: the record with the greatest 更新时间; falling back to 创建时间,
+   * then to deterministic record_id order.
+   * Returns 404 when no pending record matches the pickup code.
+   */
+  async markDoneByCode(pickupCode: string): Promise<ExpressPickupDto> {
+    const result = await this.bitable
+      .db('home')
+      .table(this.pickupsTableId)
+      .listRecords({
+        filter:
+          `CurrentValue.[${COL_PICKUP_CODE}] = "${pickupCode}" && ` +
+          `CurrentValue.[${COL_STATUS}] = "${ExpressPickupStatus.Pending}"`,
+      });
+
+    if (result.items.length === 0) {
+      throw new NotFoundException(
+        `No pending express pickup found for pickupCode="${pickupCode}"`,
+      );
+    }
+
+    // Pick the "latest" record among all pending matches.
+    // Prefer 更新时间; fall back to 创建时间; then treat as 0 (oldest).
+    const recordTimestampMs = (record: BitableRecord): number => {
+      const upd = record.fields[COL_UPDATED_AT];
+      if (typeof upd === 'number') return upd;
+      const cre = record.fields[COL_CREATED_AT];
+      if (typeof cre === 'number') return cre;
+      return 0;
+    };
+
+    const withTs = result.items.map((r) => ({
+      record: r,
+      ts: recordTimestampMs(r),
+    }));
+    const latest = withTs.reduce((best, cur) =>
+      cur.ts > best.ts ? cur : best,
+    ).record;
+
+    return this.markDone(latest.record_id);
   }
 }
