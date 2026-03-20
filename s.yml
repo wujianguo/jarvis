@@ -24,7 +24,7 @@ resources:
           - dist/main
       triggers:
         - triggerName: defaultTrigger
-          triggerTypee: http
+          triggerType: http
           triggerConfig:
             authType: anonymous
             methods:
