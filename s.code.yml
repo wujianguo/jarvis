@@ -16,3 +16,5 @@ resources:
       region: 'cn-shanghai'
       functionName: jarvis-nestjs
       code: '.'
+      memorySize: 256
+      timeout: 600
