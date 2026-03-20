@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import {
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -18,6 +19,7 @@ import { ExpressPickupsService } from './express-pickups.service';
 import { CreateExpressPickupDto } from './dto/create-express-pickup.dto';
 import { UpdateExpressPickupDto } from './dto/update-express-pickup.dto';
 import { ExpressPickupDto } from './dto/express-pickup.dto';
+import { MarkDoneByCodeDto } from './dto/mark-done-by-code.dto';
 import { ExpressPickupStatus } from './express-pickup-status.enum';
 
 @ApiTags('express')
@@ -55,6 +57,26 @@ export class ExpressPickupsController {
     return this.service.findAll(status);
   }
 
+  @Post('done-by-code')
+  @ApiOperation({
+    summary: '通过取件码标记已取件',
+    description:
+      '查找取件码匹配且状态为未取件的记录；多条匹配时取更新时间最新的一条；' +
+      '将状态更新为已取件，并同步完成对应飞书任务（若存在 taskId）。' +
+      '无匹配的未取件记录时返回 404。',
+  })
+  @ApiBody({ type: MarkDoneByCodeDto })
+  @ApiResponse({
+    status: 201,
+    type: ExpressPickupDto,
+    description: '标记成功，返回更新后的记录',
+  })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 404, description: '未找到匹配的未取件记录' })
+  markDoneByCode(@Body() dto: MarkDoneByCodeDto): Promise<ExpressPickupDto> {
+    return this.service.markDoneByCode(dto.pickupCode);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '查询单条快递取件记录' })
   @ApiParam({ name: 'id', description: '取件记录 ID' })
@@ -78,5 +100,23 @@ export class ExpressPickupsController {
     @Body() dto: UpdateExpressPickupDto,
   ): Promise<ExpressPickupDto> {
     return this.service.update(id, dto);
+  }
+
+  @Post(':id/done')
+  @ApiOperation({
+    summary: '标记快递已取件（按 ID）',
+    description:
+      '将指定记录的状态更新为已取件，更新 更新时间，并同步完成对应飞书任务（若存在 taskId）。' +
+      '幂等：若记录已为已取件，仍正常返回当前记录并尝试完成任务，不会报错。',
+  })
+  @ApiParam({ name: 'id', description: '取件记录 ID' })
+  @ApiResponse({
+    status: 201,
+    type: ExpressPickupDto,
+    description: '标记成功，返回更新后的记录',
+  })
+  @ApiResponse({ status: 404, description: '记录不存在' })
+  markDone(@Param('id') id: string): Promise<ExpressPickupDto> {
+    return this.service.markDone(id);
   }
 }
