@@ -1,0 +1,18 @@
+edition: 3.0.0
+name: jarvis-nestjs
+access: default
+
+resources:
+  jarvis:
+    component: fc3
+    actions:
+      pre-deploy:
+        - run: npm ci
+        - run: npm run build
+        - run: npm ci --omit=dev
+        - run: npm cache clean --force
+        - run: wget http://mirrors.nju.edu.cn/nodejs-release/v22.16.0/node-v22.16.0-linux-x64.tar.gz -O node-v22.16.0-linux-x64.tar.gz && tar -zxvf node-v22.16.0-linux-x64.tar.gz && rm -rf node-v22.16.0-linux-x64.tar.gz
+    props:
+      region: 'cn-shanghai'
+      functionName: jarvis-nestjs
+      code: '.'
