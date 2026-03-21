@@ -1,7 +1,7 @@
 export interface SmsClassificationResult {
   kind: 'express_pickup' | 'other' | 'unknown';
-  pickupCode?: string;
-  address?: string;
+  pickupCode?: string | null;
+  address?: string | null;
   confidence: number;
 }
 
