@@ -1,14 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateObject, type LanguageModel } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { generateText, Output } from 'ai';
+import { createAiGateway } from 'ai-gateway-provider';
+import { createOpenAI } from 'ai-gateway-provider/providers/openai';
 import { z } from 'zod';
 import { AppConfigService } from '../../config/app-config.service';
 import { SmsClassificationResult } from './interfaces/sms-handler.interface';
 
 const classificationSchema = z.object({
   kind: z.enum(['express_pickup', 'other', 'unknown']),
-  pickupCode: z.string().optional(),
-  address: z.string().optional(),
+  pickupCode: z.string().nullable(),
+  address: z.string().nullable(),
   confidence: z.number().min(0).max(1),
 });
 
@@ -19,15 +20,23 @@ export class SmsAiService {
   constructor(private readonly config: AppConfigService) {}
 
   async classifySms(content: string): Promise<SmsClassificationResult> {
-    const { apiKey, model, baseURL } = this.config.ai;
+    const { cloudflareAccountId, gatewayName, cfAigToken } = this.config.ai;
+    const aigateway = createAiGateway({
+      accountId: cloudflareAccountId,
+      gateway: gatewayName,
+      apiKey: cfAigToken,
+    });
 
-    const openai = createOpenAI({ apiKey, baseURL });
+    const openai = createOpenAI();
 
     try {
-      // Type assertion needed due to @ai-sdk/openai version mismatch with ai@5
-      const { object } = await generateObject({
-        model: openai(model) as unknown as LanguageModel,
-        schema: classificationSchema,
+      const result = await generateText({
+        model: aigateway(openai.chat('gpt-5-mini')),
+        output: Output.object({
+          schema: classificationSchema,
+          name: 'sms_classification',
+          description: '短信分类结果，包含类型、关键信息和置信度',
+        }),
         system: [
           '你是一个短信分类助手。请分析下面的短信内容，判断其类型并提取关键信息。',
           '类型说明：',
@@ -40,7 +49,7 @@ export class SmsAiService {
         prompt: `短信内容：\n${content}`,
       });
 
-      return object;
+      return result.output;
     } catch (err) {
       this.logger.warn(`AI classification failed: ${String(err)}`);
       return { kind: 'unknown', confidence: 0 };

@@ -27,9 +27,9 @@ export class AppConfigService {
 
   get ai() {
     return {
-      apiKey: this.configService.get<string>('OPENAI_API_KEY', ''),
-      model: this.configService.get<string>('AI_MODEL', 'gpt-4o-mini'),
-      baseURL: this.configService.get<string>('OPENAI_BASE_URL'),
+      cloudflareAccountId: this.configService.getOrThrow<string>('CLOUDFLARE_ACCOUNT_ID'),
+      gatewayName: this.configService.getOrThrow<string>('GATEWAY_NAME'),
+      cfAigToken: this.configService.getOrThrow<string>('CF_AIG_TOKEN'),
     };
   }
 
