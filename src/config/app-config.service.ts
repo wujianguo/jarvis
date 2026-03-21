@@ -25,6 +25,23 @@ export class AppConfigService {
     };
   }
 
+  get ai() {
+    return {
+      apiKey: this.configService.get<string>('OPENAI_API_KEY', ''),
+      model: this.configService.get<string>('AI_MODEL', 'gpt-4o-mini'),
+      baseURL: this.configService.get<string>('OPENAI_BASE_URL'),
+    };
+  }
+
+  get sms() {
+    return {
+      dedupTtlSeconds: this.configService.get<number>(
+        'SMS_DEDUP_TTL_SECONDS',
+        120,
+      ),
+    };
+  }
+
   get feishu() {
     const databasesJson = this.configService.get<string>(
       'FEISHU_BITABLE_DATABASES_JSON',

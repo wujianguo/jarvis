@@ -7,5 +7,6 @@ import { ExpressPickupsService } from './express-pickups.service';
   imports: [FeishuModule],
   controllers: [ExpressPickupsController],
   providers: [ExpressPickupsService],
+  exports: [ExpressPickupsService],
 })
 export class ExpressModule {}
