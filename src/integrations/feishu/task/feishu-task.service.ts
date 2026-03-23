@@ -86,13 +86,17 @@ export class FeishuTaskService {
     return task;
   }
 
-  async updateTask(taskGuid: string, payload: UpdateTaskPayload): Promise<void> {
+  async updateTask(
+    taskGuid: string,
+    payload: UpdateTaskPayload,
+  ): Promise<void> {
     const task: Record<string, unknown> = {};
     if (payload.summary !== undefined) task.summary = payload.summary;
     if (payload.description !== undefined)
       task.description = payload.description;
     if (payload.members !== undefined) task.members = payload.members;
-    if (payload.completed_at !== undefined) task.completed_at = payload.completed_at;
+    if (payload.completed_at !== undefined)
+      task.completed_at = payload.completed_at;
 
     const updateFields = Object.keys(task);
     if (updateFields.length === 0) return;
