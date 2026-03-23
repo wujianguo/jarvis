@@ -370,6 +370,7 @@ describe('ExpressPickups Webhook (e2e)', () => {
 
   const mockTaskService = {
     createTask: jest.fn(),
+    getTask: jest.fn(),
     updateTask: jest.fn(),
   };
 
@@ -431,6 +432,10 @@ describe('ExpressPickups Webhook (e2e)', () => {
     const taskGuid = 'task_guid_001';
     const recordId = 'rec_001';
 
+    mockTaskService.getTask.mockResolvedValueOnce({
+      guid: taskGuid,
+      completed_at: '1234567890000',
+    });
     mockTableAccessor.listRecords.mockResolvedValueOnce({
       items: [
         {
@@ -447,12 +452,10 @@ describe('ExpressPickups Webhook (e2e)', () => {
     });
 
     await dispatcher.dispatch('task.task.update_tenant_v1', {
-      task: {
-        guid: taskGuid,
-        completed_at: '1234567890000',
-      },
+      task_id: taskGuid,
     });
 
+    expect(mockTaskService.getTask).toHaveBeenCalledWith(taskGuid);
     expect(mockTableAccessor.listRecords).toHaveBeenCalledWith(
       expect.objectContaining({
         filter: expect.stringContaining(taskGuid) as unknown,
@@ -465,13 +468,16 @@ describe('ExpressPickups Webhook (e2e)', () => {
   });
 
   it('should NOT update Bitable record when task.task.update_tenant_v1 has no completed_at', async () => {
-    await dispatcher.dispatch('task.task.update_tenant_v1', {
-      task: {
-        guid: 'task_guid_002',
-        completed_at: '',
-      },
+    mockTaskService.getTask.mockResolvedValueOnce({
+      guid: 'task_guid_002',
+      completed_at: '',
     });
 
+    await dispatcher.dispatch('task.task.update_tenant_v1', {
+      task_id: 'task_guid_002',
+    });
+
+    expect(mockTaskService.getTask).toHaveBeenCalledWith('task_guid_002');
     expect(mockTableAccessor.listRecords).not.toHaveBeenCalled();
     expect(mockTableAccessor.updateRecord).not.toHaveBeenCalled();
   });

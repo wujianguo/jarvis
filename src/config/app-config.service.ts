@@ -27,7 +27,9 @@ export class AppConfigService {
 
   get ai() {
     return {
-      cloudflareAccountId: this.configService.getOrThrow<string>('CLOUDFLARE_ACCOUNT_ID'),
+      cloudflareAccountId: this.configService.getOrThrow<string>(
+        'CLOUDFLARE_ACCOUNT_ID',
+      ),
       gatewayName: this.configService.getOrThrow<string>('GATEWAY_NAME'),
       cfAigToken: this.configService.getOrThrow<string>('CF_AIG_TOKEN'),
     };

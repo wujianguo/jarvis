@@ -6,13 +6,12 @@ import {
 import { FeishuBitableService } from '../bitable/feishu-bitable.service';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ExpressPickupStatus } from '../../../domains/express/express-pickup-status.enum';
+import { FeishuTaskService } from './feishu-task.service';
 
-interface TaskUpdateEvent {
-  task?: {
-    guid?: string;
-    completed_at?: string;
-    [key: string]: unknown;
-  };
+interface TaskUpdateTenantV1Event {
+  task_id?: string;
+  object_type?: string;
+  event_type?: string;
   [key: string]: unknown;
 }
 
@@ -27,26 +26,47 @@ export class FeishuTaskEventHandler
     private readonly dispatcher: FeishuEventDispatcher,
     private readonly bitable: FeishuBitableService,
     private readonly config: AppConfigService,
+    private readonly taskService: FeishuTaskService,
   ) {}
 
   onModuleInit(): void {
     this.dispatcher.register(this);
   }
 
-  async handle(event: Record<string, unknown>): Promise<void> {
-    const taskEvent = event as TaskUpdateEvent;
-    const task = taskEvent.task;
-    if (!task?.guid) {
-      this.logger.warn('Received task update event without task guid');
+  async handle(
+    event: Record<string, unknown>,
+    header?: Record<string, unknown>,
+  ): Promise<void> {
+    const e = event as TaskUpdateTenantV1Event;
+    const taskGuid = e.task_id;
+    const eventId =
+      typeof header?.['event_id'] === 'string' ? header['event_id'] : '';
+
+    if (!taskGuid) {
+      this.logger.warn(
+        `Received task update event without task_id (event_id=${eventId})`,
+      );
       return;
     }
 
-    const taskGuid = task.guid;
-    const completedAt = task.completed_at;
+    // Query Feishu Task v2 API for task details to determine completion status.
+    let completedAt: string | undefined;
+    try {
+      const task = await this.taskService.getTask(taskGuid);
+      completedAt =
+        typeof task.completed_at === 'string' ? task.completed_at : undefined;
+    } catch (err) {
+      this.logger.error(
+        `Failed to fetch Feishu task detail for task_id=${taskGuid} (event_id=${eventId}): ${String(err)}`,
+      );
+      return;
+    }
 
-    // Only process when task is completed (completed_at is set and non-empty)
+    // Only proceed when the task has been marked as completed.
     if (!completedAt) {
-      this.logger.debug(`Task ${taskGuid} updated but not completed, skipping`);
+      this.logger.debug(
+        `Task ${taskGuid} updated but not completed (completed_at empty), skipping (event_id=${eventId})`,
+      );
       return;
     }
 
@@ -62,7 +82,6 @@ export class FeishuTaskEventHandler
     const tableId = homeDb.tables['express_pickups'].tableId;
 
     try {
-      // Search for the pickup record with this task_id
       const result = await this.bitable
         .db('home')
         .table(tableId)
