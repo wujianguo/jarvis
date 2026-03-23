@@ -20,6 +20,12 @@ export interface UpdateTaskPayload {
   completed_at?: string;
 }
 
+export interface FeishuTask {
+  guid: string;
+  completed_at?: string;
+  [key: string]: unknown;
+}
+
 interface CreateTaskResponse {
   task: {
     guid: string;
@@ -32,6 +38,10 @@ interface UpdateTaskResponse {
     guid: string;
     [key: string]: unknown;
   };
+}
+
+interface GetTaskResponse {
+  task: FeishuTask;
 }
 
 @Injectable()
@@ -62,17 +72,27 @@ export class FeishuTaskService {
     return taskGuid;
   }
 
-  async updateTask(
-    taskGuid: string,
-    payload: UpdateTaskPayload,
-  ): Promise<void> {
+  async getTask(taskGuid: string): Promise<FeishuTask> {
+    const response = await this.http.get<GetTaskResponse>(
+      `/open-apis/task/v2/tasks/${taskGuid}`,
+      { params: { user_id_type: 'user_id' } },
+    );
+    const task = response.data.data?.task;
+    if (!task?.guid) {
+      throw new InternalServerErrorException(
+        'Feishu Task API did not return a task guid',
+      );
+    }
+    return task;
+  }
+
+  async updateTask(taskGuid: string, payload: UpdateTaskPayload): Promise<void> {
     const task: Record<string, unknown> = {};
     if (payload.summary !== undefined) task.summary = payload.summary;
     if (payload.description !== undefined)
       task.description = payload.description;
     if (payload.members !== undefined) task.members = payload.members;
-    if (payload.completed_at !== undefined)
-      task.completed_at = payload.completed_at;
+    if (payload.completed_at !== undefined) task.completed_at = payload.completed_at;
 
     const updateFields = Object.keys(task);
     if (updateFields.length === 0) return;
