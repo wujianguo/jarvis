@@ -16,6 +16,7 @@ resources:
       region: 'cn-shanghai'
       code: '.'
       memorySize: 256
+      cpu: 0.25
       timeout: 600
       functionName: jarvis-nestjs
       customRuntimeConfig:
@@ -33,62 +34,15 @@ resources:
               - PUT
               - PATCH
               - DELETE
-      # customDomains:
-      #   - domainName: auto
-      #     protocol: HTTP
-      #     routeConfigs:
-      #       - path: /*
-      #         methods:
-      #           - GET
-      #           - POST
-      #           - PUT
-      #           - PATCH
-      #           - DELETE
-
-# services:
-#   nestjs:
-#     component: fc
-#     actions:
-#       pre-deploy:
-#         - run: npm ci --registry=https://registry.npmmirror.com
-#         - run: npm run build
-#         - run: npm ci --omit=dev --registry=https://registry.npmmirror.com
-#         - run: npm cache clean --force
-# #        - run: wget http://mirrors.nju.edu.cn/nodejs/v16.14.2/node-v16.14.2-linux-x64.tar.gz -O node-v16.14.2-linux-x64.tar.gz && tar -zxvf node-v16.14.2-linux-x64.tar.gz && rm -rf node-v16.14.2-linux-x64.tar.gz
-#     props: # 组件的属性值
-#       region: ${vars.region} # 关于变量的使用方法，可以参考：https://www.serverless-devs.com/serverless-devs/yaml#变量赋值
-#       service: ${vars.service}
-#       function:
-#         name: ${vars.functionName}
-#         description: ${vars.description}
-#         codeUri: '.'
-#         runtime: custom
-#         memorySize: 256
-#         timeout: 60
-#         caPort: 3000
-#         customRuntimeConfig:
-#           command:
-#             - node
-#             - dist/main
-#       triggers:
-#         - name: defaultTrigger
-#           type: http
-#           config:
-#             authType: anonymous
-#             methods:
-#               - GET
-#               - POST
-#               - PUT
-#               - PATCH
-#               - DELETE
-#       customDomains:
-#         - domainName: auto
-#           protocol: HTTP
-#           routeConfigs:
-#             - path: /*
-#               methods:
-#                 - GET
-#                 - POST
-#                 - PUT
-#                 - PATCH
-#                 - DELETE
+      environmentVariables:
+        KV_BASE_URL: ${env('KV_BASE_URL')}
+        KV_API_TOKEN: ${env('KV_API_TOKEN')}
+        FEISHU_BITABLE_DATABASES_JSON: ${env('FEISHU_BITABLE_DATABASES_JSON')}
+        FEISHU_APP_ID: ${env('FEISHU_APP_ID')}
+        FEISHU_APP_SECRET: ${env('FEISHU_APP_SECRET')}
+        FEISHU_VERIFICATION_TOKEN: ${env('FEISHU_VERIFICATION_TOKEN')}
+        FEISHU_SHEETS_EXPORT_SPREADSHEET_TOKEN: ${env('FEISHU_SHEETS_EXPORT_SPREADSHEET_TOKEN')}
+        FEISHU_SHEETS_EXPORT_SHEET_ID: ${env('FEISHU_SHEETS_EXPORT_SHEET_ID')}
+        CLOUDFLARE_ACCOUNT_ID: ${env('CLOUDFLARE_ACCOUNT_ID')}
+        GATEWAY_NAME: ${env('GATEWAY_NAME')}
+        CF_AIG_TOKEN: ${env('CF_AIG_TOKEN')}
