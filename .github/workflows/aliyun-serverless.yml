@@ -15,4 +15,4 @@ jobs:
           node-version: 22
       - run: npm install -g @serverless-devs/s
       - run: s config add --AccessKeyID ${{secrets.ALIYUN_ACCESS_KEY_ID}} --AccessKeySecret ${{secrets.ALIYUN_ACCESS_KEY_SECRET}} --AccountID ${{secrets.ALIYUN_ACCOUNT_ID}} --access default
-      - run: s deploy -y --use-local
+      - run: KV_BASE_URL=${{secrets.KV_BASE_URL}} KV_API_TOKEN=${{secrets.KV_API_TOKEN}} FEISHU_BITABLE_DATABASES_JSON=${{secrets.FEISHU_BITABLE_DATABASES_JSON}} FEISHU_APP_ID=${{secrets.FEISHU_APP_ID}} FEISHU_APP_SECRET=${{secrets.FEISHU_APP_SECRET}} FEISHU_VERIFICATION_TOKEN=${{secrets.FEISHU_VERIFICATION_TOKEN}} FEISHU_SHEETS_EXPORT_SPREADSHEET_TOKEN=${{secrets.FEISHU_SHEETS_EXPORT_SPREADSHEET_TOKEN}} FEISHU_SHEETS_EXPORT_SHEET_ID=${{secrets.FEISHU_SHEETS_EXPORT_SHEET_ID}} CLOUDFLARE_ACCOUNT_ID=${{secrets.CLOUDFLARE_ACCOUNT_ID}} GATEWAY_NAME=${{secrets.GATEWAY_NAME}} CF_AIG_TOKEN=${{secrets.CF_AIG_TOKEN}} s deploy -y --use-local
