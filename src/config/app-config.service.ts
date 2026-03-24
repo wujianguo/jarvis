@@ -44,6 +44,20 @@ export class AppConfigService {
     };
   }
 
+  get wecom() {
+    return {
+      baseUrl: this.configService.get<string>(
+        'WECOM_BASE_URL',
+        'https://qyapi.weixin.qq.com',
+      ),
+      corpId: this.configService.get<string>('WECOM_CORP_ID'),
+      corpSecret: this.configService.get<string>('WECOM_CORP_SECRET'),
+      agentId: this.configService.get<number>('WECOM_AGENT_ID'),
+      token: this.configService.get<string>('WECOM_TOKEN'),
+      encodingAESKey: this.configService.get<string>('WECOM_ENCODING_AES_KEY'),
+    };
+  }
+
   get feishu() {
     const databasesJson = this.configService.get<string>(
       'FEISHU_BITABLE_DATABASES_JSON',

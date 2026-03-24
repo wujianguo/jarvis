@@ -124,6 +124,31 @@ SMS_DEDUP_TTL_SECONDS=120
 
 > 当前实现通过 AI Gateway 路由 OpenAI 兼容模型，短信分类模型固定为 `gpt-5-mini`。
 
+### 企业微信（WeCom）配置（启用企业微信消息发送与回调）
+
+```bash
+# 企业微信 API 基础 URL（可选，默认 https://qyapi.weixin.qq.com）
+WECOM_BASE_URL=https://qyapi.weixin.qq.com
+
+# 企业ID（必填，企业微信管理后台 > 我的企业 > 企业信息）
+WECOM_CORP_ID=
+
+# 应用 Secret（必填，企业微信管理后台 > 应用管理 > 对应应用 > 应用详情）
+WECOM_CORP_SECRET=
+
+# 应用 AgentId（必填，企业微信管理后台 > 应用管理 > 对应应用 > 应用详情）
+WECOM_AGENT_ID=
+
+# 回调 Token（配置回调接收时必填，企业微信管理后台 > 应用 > 接收消息 > API 接收）
+WECOM_TOKEN=
+
+# EncodingAESKey（配置回调接收时必填，与 Token 同处配置）
+# 43 位 Base64 字符，用于解密企业微信回调加密消息
+WECOM_ENCODING_AES_KEY=
+```
+
+> 企业微信 `access_token` 会被缓存到 KV（key: `wecom:access_token:<corpId>`，TTL=expires_in-60s）。若未配置 KV，每次请求将直接向企业微信获取新 token。
+
 ---
 
 ## 数据存储设计（Bitable）
@@ -184,6 +209,47 @@ Jarvis 的核心思路是：**每个业务域在 Bitable 中有一个 App（appT
   - 支持 `url_verification` challenge
   - 支持 schema 2.0 事件接收并按 `event_type` 分发
   - 支持 `task.task.update_tenant_v1` 事件：任务完成时自动回写取件记录 `status=done`
+
+### WeCom 企业微信
+
+#### 发送消息
+
+- `POST /api/wecom/messages/text` — 通过企业微信自建应用发送文本消息
+
+  **请求体：**
+  ```json
+  {
+    "toUser": "user1,user2",   // 可选，用户ID（逗号分隔），不填则 @all
+    "toParty": "1",            // 可选，部门ID（逗号分隔）
+    "toTag": "1",              // 可选，标签ID（逗号分隔）
+    "content": "Hello from Jarvis!",  // 必填，文本内容
+    "safe": 0                  // 可选，0=非保密（默认），1=保密消息
+  }
+  ```
+
+  **返回：**
+  ```json
+  {
+    "errcode": 0,
+    "errmsg": "ok",
+    "invaliduser": "",
+    "invalidparty": "",
+    "invalidtag": ""
+  }
+  ```
+
+  > ⚠️ **安全提示**：本接口当前无鉴权，请勿在未做访问控制的情况下公开暴露。
+
+#### 回调接收
+
+- `GET /api/wecom/webhook` — 企业微信回调 URL 验证（设置回调 URL 时调用）
+- `POST /api/wecom/webhook` — 接收企业微信事件回调（加密 XML）
+
+  回调流程：
+  1. 验证签名（`msg_signature` = SHA1(sort(token, timestamp, nonce, encrypt))）
+  2. AES-256-CBC 解密消息体
+  3. 解析内层 XML，提取 `MsgType` + `Event` 组合为事件类型（如 `event.subscribe`）
+  4. 通过 `WecomEventDispatcher` 分发到已注册的 Handler
 
 ---
 
