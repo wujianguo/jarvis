@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { generateText, Output } from 'ai';
 import { createAiGateway } from 'ai-gateway-provider';
-import { createOpenAI } from 'ai-gateway-provider/providers/openai';
+import { createDeepSeek } from 'ai-gateway-provider/providers/deepseek';
 import { z } from 'zod';
 import { AppConfigService } from '../../config/app-config.service';
 import { SmsClassificationResult } from './interfaces/sms-handler.interface';
@@ -27,11 +27,11 @@ export class SmsAiService {
       apiKey: cfAigToken,
     });
 
-    const openai = createOpenAI();
+    const deepseek = createDeepSeek();
 
     try {
       const result = await generateText({
-        model: aigateway(openai.chat('gpt-5-mini')),
+        model: aigateway(deepseek.chat('deepseek-v4-flash')),
         output: Output.object({
           schema: classificationSchema,
           name: 'sms_classification',
